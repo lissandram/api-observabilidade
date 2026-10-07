@@ -1,114 +1,137 @@
 # Projeto de Observabilidade com a Stack Elastic e Node.js
 
-Este repositório contém o código-fonte, scripts de orquestração e configurações para a implantação de um **Projeto Básico de Observabilidade** utilizando a **Stack Elastic** (Elasticsearch, Kibana e APM Server) para monitoramento de uma API REST desenvolvida em Node.js/Express.
+Este repositório contém o código-fonte, o arquivo de orquestração e as instruções para implantar um Projeto Básico de Observabilidade com a Stack Elastic (Elasticsearch, Kibana e APM Server), monitorando uma API REST em Node.js/Express.
 
-> **Contexto Acadêmico:** Trabalho prático e artigo técnico desenvolvido para a disciplina de **Gerenciamento e Monitoramento de Aplicações e Infraestrutura** do curso de Especialização em Engenharia DevOps — **Instituto Federal de Mato Grosso (IFMT)**.
+**Contexto acadêmico:** trabalho prático e artigo técnico da disciplina *Gerenciamento e Monitoramento de Aplicações e Infraestrutura*, Especialização em Engenharia DevOps, Instituto Federal de Mato Grosso (IFMT).
 
----
+> **Aviso:** o ambiente foi montado apenas para laboratório (nó único, rede local). A autenticação do Elasticsearch/Kibana está desativada (`xpack.security.enabled=false`) e o APM Server aceita conexões anônimas (`apm-server.auth.anonymous.enabled=true`). **Não use esta configuração em produção.**
 
-## Arquitetura da Solução
+## Arquitetura da solução
 
-O diagrama abaixo ilustra a arquitetura do ambiente conteinerizado via Docker Compose no WSL2 e o fluxo de telemetria entre a aplicação Node.js, o APM Server, o Elasticsearch e o Kibana:
+O diagrama mostra os containers (Docker Compose no WSL2) e o fluxo de telemetria entre a aplicação Node.js, o APM Server, o Elasticsearch e o Kibana. A API roda diretamente no WSL2, fora dos containers.
 
-![Arquitetura da Solução](arquitetura_ferramenta.png)
+![Arquitetura da solução](arquitetura_ferramenta.png)
 
----
+## Estrutura do repositório
 
-## Estrutura do Repositório
-
-O projeto está organized nos seguintes diretórios e arquivos principais:
-
-```bash
+```
 .
-├── api/                     # Código-fonte da API REST em Node.js/Express
-│   ├── server.js            # Entrypoint da aplicação e inicialização do Agente APM
-│   ├── package.json         # Dependências (express, elastic-apm-node, winston, etc.)
-│   └── ...
-├── elastic-stack/           # Módulo de infraestrutura e orquestração dos containers
-│   ├── docker-compose.yml   # Especificação dos serviços (Elasticsearch, Kibana, APM Server)
-│   └── ...
-├── arquitetura_ferramenta.png # Diagrama de arquitetura da solução
-└── README.md                # Documentação e guia de execução do projeto
+├── api/                         # API REST em Node.js/Express
+│   ├── server.js                # Entrypoint e inicialização do agente APM
+│   ├── package.json             # Dependências: express, elastic-apm-node, winston
+│   └── package-lock.json        # Versões fixadas das dependências
+├── elastic-stack/
+│   └── docker-compose.yml       # Elasticsearch, Kibana e APM Server
+├── arquitetura_ferramenta.png   # Diagrama de arquitetura
+└── README.md
 ```
 
-## Tecnologias Utilizadas
+## Tecnologias e versões
 
-- **Aplicação:** Node.js (v18.19) com Express framework.
-- **Agente de Telemetria:** `elastic-apm-node` (v4.18.0) no padrão ECS (*Elastic Common Schema* v8.10.0).
-- **Stack de Observabilidade:** Elastic Stack (v8.12.2)
-  - **Elasticsearch:** Armazenamento, indexação distribuída e busca em séries temporais (Porta `9200`).
-  - **Elastic APM Server:** Ingestão, conversão e processamento de traces, métricas e exceções (Porta `8200`).
-  - **Kibana:** Dashboards analíticos, consultas KQL e visualização de percentis via Kibana Lens (Porta `5601`).
-- **Orquestração & Virtualização:** Docker Engine, Docker Compose no ambiente **WSL2** (Ubuntu 22.04 LTS).
-- **Gerador de Carga:** Utilitário `autocannon` para simulação de requisições HTTP concorrentes.
+| Componente | Versão / detalhe |
+|---|---|
+| Sistema | Windows 11 Pro, WSL2 com Ubuntu 22.04 LTS |
+| Node.js | v18.19.1 |
+| Express | ^5.2.1 |
+| Winston | ^3.19.0 (logs em JSON no console) |
+| Agente | `elastic-apm-node` 4.18.0 (ECS 8.10.0) |
+| Elastic Stack | 8.12.2 (Elasticsearch, Kibana, APM Server) |
+| Docker | Engine v24.0+ e Compose v2.20+ |
+| Gerador de carga | autocannon (instalação global; versão: `autocannon --version`) |
 
----
+Portas: Elasticsearch `9200`, APM Server `8200`, Kibana `5601`, API `3000`.
+Rede Docker: `elastic` (bridge).
 
-## Endpoints da API para Testes de Observabilidade
+## Limites de recursos do WSL2
 
-A API disponibiliza rotas simuladas para exercitar a captura de telemetria pelo agente APM:
+O Elasticsearch roda com heap de JVM fixado em 512 MB (`-Xms512m -Xmx512m`). Para evitar que o WSL2 consuma toda a memória do Windows, foi usado o arquivo `.wslconfig` abaixo, salvo em `C:\Users\<usuario>\.wslconfig`:
 
-| Rota | Método | Descrição / Comportamento Esperado | Status |
-| :--- | :---: | :--- | :---: |
-| `/api/sucesso` | `GET` | Transação padrão com resposta rápida de baixa latência. | `200 OK` |
-| `/api/lento` | `GET` | Simula gargalo de banco de dados/integração via span manual de **1,5 s (1.500 ms)**. | `200 OK` |
-| `/api/erro` | `GET` | Simula falha de regra de negócio reportada via `captureError` com *stack trace*. | `500 Internal Error` |
+```ini
+[wsl2]
+memory=6GB
+processors=4
+swap=2GB
+```
 
----
+Depois de criar ou alterar o arquivo, reinicie o WSL: `wsl --shutdown`.
 
-## Como Executar o Projeto
+## Endpoints da API
+
+| Rota | Método | Comportamento | Status |
+|---|---|---|---|
+| `/` | GET | Página inicial de teste | 200 |
+| `/api/sucesso` | GET | Transação rápida e de baixa latência | 200 |
+| `/api/lento` | GET | Span manual `consulta_banco_dados_ficticio` com atraso de 1,5 s (1.500 ms) | 200 |
+| `/api/erro` | GET | Falha simulada, tratada em `try/catch`, registrada em log e reportada ao APM com `captureError` (com stack trace) | 500 |
+
+Cada requisição gera um log JSON (Winston) no console com método, URL e `trace_id`. Esses logs **não** são enviados ao Elasticsearch; o `trace_id` é incluído manualmente no código.
+
+## Como executar
 
 ### Pré-requisitos
-- Docker Engine & Docker Compose instalados (recomendado via WSL2 em ambiente Windows ou Linux com Ubuntu 22 ou superior).
-- Node.js (v18+) e NPM instalados.
 
-### 1. Subir a Infraestrutura de Observabilidade (Stack Elastic)
-Navegue até o diretório `elastic-stack` e inicie os containers:
+- Docker Engine e Docker Compose (recomendado: WSL2 no Windows, ou Ubuntu 22.04+).
+- Node.js 18+ e NPM.
+
+### 1. Subir a Stack Elastic
 
 ```bash
 cd elastic-stack
 docker compose up -d
+docker compose ps        # os três containers devem estar "Up"
 ```
 
----
-## Validação dos Serviços
-Após a execução, confirme a saúde dos serviços acessando as URLs:
-- Elasticsearch (Status cluster/motor de busca): http://localhost:9200/
+Aguarde de 3 a 5 minutos e valide:
 
-- Kibana Lens / Dashboards: http://localhost:5601/app/lens
+- Elasticsearch: <http://localhost:9200/>
+- Kibana: <http://localhost:5601/>
 
-Status dos Containers: Execute docker compose ps para garantir que os três containers estão em estado Up.
-Observação: Aguarde pelo menos de 3 a 5 min para testar a execução das Urls.
+### 2. Iniciar a API
 
----
-## Iniciar a API Node.js
-
-Em um novo terminal, navegue até a pasta api, instale as dependências e execute o servidor:
+Em outro terminal:
 
 ```bash
 cd api
 npm install
-node server.js
+npm start                # equivale a: node server.js
 ```
 
-Ao iniciar, o console exibirá o log do agente elastic-apm-node atestando a conexão com o APM Server (http://localhost:8200) e a pronta escuta na porta 3000.
+O console exibirá o log do agente `elastic-apm-node` (conexão com `http://localhost:8200`) e a mensagem de que a API está na porta 3000.
 
----
-## Simulação de Carga (Testes de Desempenho)
-
-Para gerar tráfego e popular os dashboards do Kibana Lens com métricas de throughput, percentis de latência ($p50, p90, p95, p99$) e gráficos de falhas, utilize o utilitário autocannon:
+### 3. Gerar carga
 
 ```bash
-# Instalar o Autocannon globalmente (caso não possua)
+# Instalar o autocannon globalmente (se necessário)
 npm install -g autocannon
 
-# Teste de carga na rota de erro (10 conexões concorrentes, 1.000 requisições)
+# Rota de erro: 10 conexões, 1.000 requisições
 autocannon -c 10 -a 1000 http://localhost:3000/api/erro
 
-# Teste de carga na rota com gargalo de latência
+# Rota com gargalo: 5 conexões por 30 s
 autocannon -c 5 -d 30 http://localhost:3000/api/lento
+
+# Rota de sucesso (exemplo; ajuste aos parâmetros realmente usados)
+autocannon -c 10 -a 1000 http://localhost:3000/api/sucesso
 ```
 
----
-## Visualização dos Dados no Kibana
-Acesse o Kibana diretamente no Lens: http://localhost:5601/app/lens ou navegue até Analytics > Dashboards. é possível criar dashboards personalizados para validar o experimento.
+No experimento foram feitas várias execuções com parâmetros diferentes, para gerar informações na ferramenta. 
+
+<!-- Preencher: comando, rota e horário de cada execução. -->
+
+## Visualização no Kibana
+
+Os dados aparecem em **Observability → APM → Services → `api-teste-observabilidade`**:
+
+- **Transactions → `GET /api/lento`**: waterfall com o span `consulta_banco_dados_ficticio`.
+- **Errors**: grupo de erros de `/api/erro`, com mensagem, culprit e stack trace.
+
+O dashboard do artigo (throughput por rota, latência média, duração das requisições com falha e resumo por rota) foi montado no **Kibana Lens**.
+
+<!-- Preencher: passos usados para criar os Data Views e os ajustes de mappings/fielddata citados no artigo,
+     ou exportar o dashboard em Stack Management > Saved Objects (.ndjson) e versionar em docs/. -->
+
+## Limitações conhecidas
+
+- Segurança desativada e rede local: apenas para laboratório.
+- Os logs ficam no console e não são correlacionados automaticamente aos traces no Elasticsearch.
+- A aplicação é um único serviço; o experimento não demonstra rastreamento entre múltiplos serviços.
