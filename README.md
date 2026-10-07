@@ -59,7 +59,7 @@ A API disponibiliza rotas simuladas para exercitar a captura de telemetria pelo 
 ## Como Executar o Projeto
 
 ### Pré-requisitos
-- Docker Engine & Docker Compose instalados (recomendado via WSL2 em ambiente Windows ou Linux com Ubuntu 24 ou superior).
+- Docker Engine & Docker Compose instalados (recomendado via WSL2 em ambiente Windows ou Linux com Ubuntu 22 ou superior).
 - Node.js (v18+) e NPM instalados.
 
 ### 1. Subir a Infraestrutura de Observabilidade (Stack Elastic)
