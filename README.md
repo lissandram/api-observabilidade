@@ -30,7 +30,7 @@ O diagrama mostra os containers (Docker Compose no WSL2) e o fluxo de telemetria
 
 | Componente | Versão / detalhe |
 |---|---|
-| Sistema | Windows 11 Pro, WSL2 com Ubuntu 22.04 LTS |
+| Sistema | Windows 11 Pro, WSL2 com Ubuntu 24.04|
 | Node.js | v18.19.1 |
 | Express | ^5.2.1 |
 | Winston | ^3.19.0 (logs em JSON no console) |
